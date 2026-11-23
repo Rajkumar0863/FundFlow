@@ -2,6 +2,10 @@ package com.fundflow.controller;
 
 import com.fundflow.service.PaymentNotFoundException;
 import com.fundflow.service.PaymentRefundService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -22,6 +26,17 @@ public class PaymentRefundController {
 
     public record CreateRefundRequest(BigDecimal amount) {}
 
+    @Operation(
+        summary = "Create a payment refund",
+        description = "Creates a refund for an eligible payment. Supports idempotent retries and protects against concurrent over-refunding."
+    )
+    @ApiResponses({
+        @ApiResponse(responseCode = "201", description = "Refund created"),
+        @ApiResponse(responseCode = "200", description = "Existing refund returned for an idempotent replay"),
+        @ApiResponse(responseCode = "400", description = "Invalid refund request"),
+        @ApiResponse(responseCode = "404", description = "Payment not found"),
+        @ApiResponse(responseCode = "409", description = "Refund conflicts with payment state, available balance or idempotency requirements")
+    })
     @PostMapping
     public ResponseEntity<PaymentRefundService.Refund> create(
             @PathVariable UUID paymentId,
@@ -41,6 +56,11 @@ public class PaymentRefundController {
         }
     }
 
+    @Operation(summary = "List refunds for a payment")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Refunds returned"),
+        @ApiResponse(responseCode = "404", description = "Payment not found")
+    })
     @GetMapping
     public List<PaymentRefundService.Refund> list(@PathVariable UUID paymentId) {
         try {
