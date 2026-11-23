@@ -24,17 +24,41 @@ public class Payment {
     @Column(nullable = false)
     private PaymentStatus status;
 
-    @Column(nullable = false, updatable = false)
+    @Column(
+        name = "created_at",
+        nullable = false,
+        updatable = false
+    )
     private Instant createdAt;
 
+    // Optional idempotency key to prevent duplicate payments
+    @Column(
+        name = "idempotency_key",
+        length = 255,
+        unique = true
+    )
+    private String idempotencyKey;
+
+    // Required by JPA
     protected Payment() {
     }
 
+    // Existing constructor - preserves compatibility
     public Payment(BigDecimal amount, String currency) {
+        this(amount, currency, null);
+    }
+
+    // New constructor with idempotency support
+    public Payment(
+            BigDecimal amount,
+            String currency,
+            String idempotencyKey
+    ) {
         this.amount = amount;
         this.currency = currency;
         this.status = PaymentStatus.PENDING;
         this.createdAt = Instant.now();
+        this.idempotencyKey = idempotencyKey;
     }
 
     public UUID getId() {
@@ -55,5 +79,13 @@ public class Payment {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public String getIdempotencyKey() {
+        return idempotencyKey;
+    }
+
+    public void setIdempotencyKey(String idempotencyKey) {
+        this.idempotencyKey = idempotencyKey;
     }
 }

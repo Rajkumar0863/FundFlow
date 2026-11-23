@@ -1,10 +1,10 @@
-
 package com.fundflow.controller;
 
 import com.fundflow.entity.Payment;
+import com.fundflow.service.IdempotentPaymentService;
 import com.fundflow.service.PaymentService;
-
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -15,44 +15,42 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/payments")
 public class PaymentController {
-
     private final PaymentService paymentService;
+    private final IdempotentPaymentService idempotentPaymentService;
 
-    public PaymentController(PaymentService paymentService) {
+    public PaymentController(PaymentService paymentService,
+                             IdempotentPaymentService idempotentPaymentService) {
         this.paymentService = paymentService;
+        this.idempotentPaymentService = idempotentPaymentService;
     }
 
-    public record CreatePaymentRequest(
-        BigDecimal amount,
-        String currency
-    ) {}
+    public record CreatePaymentRequest(BigDecimal amount, String currency) {}
 
     @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public Payment createPayment(
-            @RequestBody CreatePaymentRequest request) {
-
+    public ResponseEntity<Payment> createPayment(
+            @RequestBody CreatePaymentRequest request,
+            @RequestHeader(value = "Idempotency-Key", required = false) String key) {
         try {
-            return paymentService.createPayment(
-                request.amount(),
-                request.currency()
-            );
-        } catch (IllegalArgumentException e) {
-            throw new ResponseStatusException(
-                HttpStatus.BAD_REQUEST, e.getMessage()
-            );
+            if (key == null) {
+                // Keep legacy behavior until all clients migrate to keyed requests.
+                return ResponseEntity.status(HttpStatus.CREATED)
+                        .body(paymentService.createPayment(request.amount(), request.currency()));
+            }
+            IdempotentPaymentService.Result result =
+                    idempotentPaymentService.create(request.amount(), request.currency(), key);
+            return ResponseEntity.status(result.created() ? HttpStatus.CREATED : HttpStatus.OK)
+                    .body(result.payment());
+        } catch (IllegalArgumentException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage());
         }
     }
 
     @GetMapping("/{id}")
     public Payment getPayment(@PathVariable UUID id) {
-
         try {
             return paymentService.getPayment(id);
-        } catch (IllegalArgumentException e) {
-            throw new ResponseStatusException(
-                HttpStatus.NOT_FOUND, e.getMessage()
-            );
+        } catch (IllegalArgumentException ex) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, ex.getMessage());
         }
     }
 
