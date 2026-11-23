@@ -1,4 +1,3 @@
-
 package com.fundflow.entity;
 
 import jakarta.persistence.*;
@@ -9,7 +8,6 @@ import java.util.UUID;
 @Entity
 @Table(name = "payments")
 public class Payment {
-
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
@@ -24,36 +22,19 @@ public class Payment {
     @Column(nullable = false)
     private PaymentStatus status;
 
-    @Column(
-        name = "created_at",
-        nullable = false,
-        updatable = false
-    )
+    @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-    // Optional idempotency key to prevent duplicate payments
-    @Column(
-        name = "idempotency_key",
-        length = 255,
-        unique = true
-    )
+    @Column(name = "idempotency_key", length = 255, unique = true)
     private String idempotencyKey;
 
-    // Required by JPA
-    protected Payment() {
-    }
+    protected Payment() {}
 
-    // Existing constructor - preserves compatibility
     public Payment(BigDecimal amount, String currency) {
         this(amount, currency, null);
     }
 
-    // New constructor with idempotency support
-    public Payment(
-            BigDecimal amount,
-            String currency,
-            String idempotencyKey
-    ) {
+    public Payment(BigDecimal amount, String currency, String idempotencyKey) {
         this.amount = amount;
         this.currency = currency;
         this.status = PaymentStatus.PENDING;
@@ -61,31 +42,26 @@ public class Payment {
         this.idempotencyKey = idempotencyKey;
     }
 
-    public UUID getId() {
-        return id;
-    }
+    public UUID getId() { return id; }
+    public BigDecimal getAmount() { return amount; }
+    public String getCurrency() { return currency; }
+    public PaymentStatus getStatus() { return status; }
+    public Instant getCreatedAt() { return createdAt; }
+    public String getIdempotencyKey() { return idempotencyKey; }
+    public void setIdempotencyKey(String idempotencyKey) { this.idempotencyKey = idempotencyKey; }
 
-    public BigDecimal getAmount() {
-        return amount;
-    }
-
-    public String getCurrency() {
-        return currency;
-    }
-
-    public PaymentStatus getStatus() {
-        return status;
-    }
-
-    public Instant getCreatedAt() {
-        return createdAt;
-    }
-
-    public String getIdempotencyKey() {
-        return idempotencyKey;
-    }
-
-    public void setIdempotencyKey(String idempotencyKey) {
-        this.idempotencyKey = idempotencyKey;
+    public void transitionTo(PaymentStatus nextStatus) {
+        if (nextStatus == null) {
+            throw new IllegalArgumentException("Payment status is required");
+        }
+        boolean allowed = switch (status) {
+            case PENDING -> nextStatus == PaymentStatus.PROCESSING || nextStatus == PaymentStatus.CANCELLED;
+            case PROCESSING -> nextStatus == PaymentStatus.SUCCEEDED || nextStatus == PaymentStatus.FAILED;
+            case SUCCEEDED, FAILED, CANCELLED -> false;
+        };
+        if (!allowed) {
+            throw new IllegalStateException("Invalid payment transition: " + status + " -> " + nextStatus);
+        }
+        this.status = nextStatus;
     }
 }
