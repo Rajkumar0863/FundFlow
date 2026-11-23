@@ -76,7 +76,7 @@ assertEquals(firstJson.get("idempotencyKey"), secondJson.get("idempotencyKey"));
         send(key, PAYMENT).andExpect(status().isCreated());
         send(key, "{\"amount\":251.00,\"currency\":\"EUR\"}")
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.error").value("IDEMPOTENCY_CONFLICT"));
+                .andExpect(jsonPath("$.code").value("IDEMPOTENCY_CONFLICT"));
         assertEquals(1, repository.count());
     }
 
